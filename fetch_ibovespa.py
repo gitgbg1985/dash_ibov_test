@@ -1,37 +1,62 @@
-name: Update Ibovespa Data
+#!/usr/bin/env python3
+"""
+Fetches Ibovespa (^BVSP) daily historical data from Yahoo Finance
+and saves it as JSON for the dashboard, and CSV for download.
+"""
 
-on:
-  schedule:
-    # Runs at 06:00 UTC on the 1st of every month
-    - cron: '0 6 1 * *'
-  workflow_dispatch:  # Allows manual trigger from GitHub UI
+import yfinance as yf
+import json
+import csv
+import os
+from datetime import datetime
 
-jobs:
-  update-data:
-    runs-on: ubuntu-latest
+OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
+JSON_PATH = os.path.join(OUTPUT_DIR, "data", "ibovespa.json")
+CSV_PATH  = os.path.join(OUTPUT_DIR, "data", "ibovespa.csv")
 
-    permissions:
-      contents: write  # Needed to push updated data files
+def fetch_and_save():
+    print("Fetching Ibovespa data from Yahoo Finance...")
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    ticker = yf.Ticker("^BVSP")
+    df = ticker.history(start="1995-01-01", interval="1d")
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+    if df.empty:
+        raise ValueError("No data returned from Yahoo Finance.")
 
-      - name: Install dependencies
-        run: pip install yfinance pandas
+    df = df.reset_index()
+    df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
 
-      - name: Fetch Ibovespa data
-        run: python fetch_ibovespa.py
+    # Build JSON for chart
+    records = []
+    for _, row in df.iterrows():
+        records.append({
+            "date":  row["Date"],
+            "close": round(float(row["Close"]), 2),
+            "open":  round(float(row["Open"]), 2),
+            "high":  round(float(row["High"]), 2),
+            "low":   round(float(row["Low"]), 2),
+            "volume": int(row["Volume"]) if row["Volume"] == row["Volume"] else 0,
+        })
 
-      - name: Commit and push updated data
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/ibovespa.json data/ibovespa.csv
-          git diff --staged --quiet || git commit -m "chore: update Ibovespa data $(date +'%Y-%m-%d')"
-          git push
+    os.makedirs(os.path.dirname(JSON_PATH), exist_ok=True)
+
+    meta = {
+        "last_updated": datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
+        "total_records": len(records),
+        "source": "Yahoo Finance (^BVSP)",
+        "data": records
+    }
+
+    with open(JSON_PATH, "w") as f:
+        json.dump(meta, f, indent=2)
+    print(f"JSON saved: {JSON_PATH} ({len(records)} records)")
+
+    # Build CSV for download
+    with open(CSV_PATH, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["date","open","high","low","close","volume"])
+        writer.writeheader()
+        writer.writerows(records)
+    print(f"CSV saved: {CSV_PATH}")
+
+if __name__ == "__main__":
+    fetch_and_save()
