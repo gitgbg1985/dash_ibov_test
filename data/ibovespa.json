@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-11-13 20:48 UTC",
+  "last_updated": "2026-11-14 18:58 UTC",
   "total_records": 7894,
   "source": "Yahoo Finance (^BVSP)",
   "data": [
@@ -63149,11 +63149,11 @@
     },
     {
       "date": "2026-11-13",
-      "close": 172432.89,
-      "open": 171324.31,
-      "high": 172715.48,
-      "low": 171132.23,
-      "volume": 0
+      "close": 172458.0,
+      "open": 171324.0,
+      "high": 172716.0,
+      "low": 171132.0,
+      "volume": 10691600
     }
   ]
 }
